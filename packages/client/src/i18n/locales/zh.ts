@@ -480,6 +480,10 @@ export default {
       liveMonitorHumanOnly: '实时监看：仅显示人类会话',
       liveMonitorHumanOnlyHint: '在实时监看中默认隐藏子代理和会话监看噪音',
       atHourHint: '每天在指定小时重置会话',
+      storeMode: '会话数据源',
+      storeModeHint: '本地：使用自建 SQLite 数据库（首次启动从 CLI 同步）；远程：直读 Hermes CLI state.db',
+      storeLocal: '本地',
+      storeRemote: '远程（直读 CLI）',
     },
     privacy: {
       redactPii: '脱敏 PII',

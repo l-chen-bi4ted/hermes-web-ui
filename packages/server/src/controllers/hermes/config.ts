@@ -3,6 +3,7 @@ import YAML from 'js-yaml'
 import { restartGateway } from '../../services/hermes/hermes-cli'
 import { getActiveConfigPath, getActiveEnvPath } from '../../services/hermes/hermes-profile'
 import { saveEnvValue } from '../../services/config-helpers'
+import { getSessionStore, setSessionStore } from '../../config'
 
 const PLATFORM_SECTIONS = new Set([
   'telegram', 'discord', 'slack', 'whatsapp', 'matrix',
@@ -112,14 +113,25 @@ export async function getConfig(ctx: any) {
     }
     const { section, sections } = ctx.query
     if (section) {
+      if (section === 'session_store') {
+        ctx.body = { session_store: { mode: getSessionStore() } }
+        return
+      }
       ctx.body = { [section as string]: config[section as string] || {} }
     } else if (sections) {
       const keys = (sections as string).split(',')
       const result: Record<string, any> = {}
-      for (const key of keys) { result[key.trim()] = config[key.trim()] || {} }
+      for (const key of keys) {
+        const k = key.trim()
+        if (k === 'session_store') {
+          result.session_store = { mode: getSessionStore() }
+        } else {
+          result[k] = config[k] || {}
+        }
+      }
       ctx.body = result
     } else {
-      ctx.body = config
+      ctx.body = { ...config, session_store: { mode: getSessionStore() } }
     }
   } catch (err: any) {
     ctx.status = 500; ctx.body = { error: err.message }
@@ -132,6 +144,16 @@ export async function updateConfig(ctx: any) {
     ctx.status = 400; ctx.body = { error: 'Missing section or values' }; return
   }
   try {
+    // session_store is runtime-only, not persisted to YAML
+    if (section === 'session_store') {
+      const mode = values.mode as string
+      if (mode !== 'local' && mode !== 'remote') {
+        ctx.status = 400; ctx.body = { error: 'session_store.mode must be "local" or "remote"' }; return
+      }
+      setSessionStore(mode)
+      ctx.body = { success: true, session_store: { mode: getSessionStore() } }
+      return
+    }
     const config = await readConfig()
     config[section] = deepMerge(config[section] || {}, values)
     await writeConfig(config)
