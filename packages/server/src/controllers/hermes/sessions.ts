@@ -10,6 +10,7 @@ import {
   renameSession as localRenameSession,
   useLocalSessionStore,
 } from '../../db/hermes/session-store'
+import { forceSyncAllHermesSessions } from '../../services/hermes/session-sync'
 import { deleteUsage, getUsage, getUsageBatch, getLocalUsageStats } from '../../db/hermes/usage-store'
 import type { LocalUsageStats, UsageStatsModelRow, UsageStatsDailyRow } from '../../db/hermes/usage-store'
 import { getModelContextLength } from '../../services/hermes/model-context'
@@ -400,5 +401,14 @@ export async function usageStats(ctx: any) {
     total_cost: totalCost,
     model_usage: [...modelMap.values()].sort((a, b) => (b.input_tokens + b.output_tokens) - (a.input_tokens + a.output_tokens)),
     daily_usage: [...dayMap.values()],
+  }
+}
+
+export async function syncFromCli(ctx: any) {
+  const result = forceSyncAllHermesSessions()
+  ctx.body = {
+    synced: result.synced,
+    updated: result.updated,
+    errors: result.errors,
   }
 }

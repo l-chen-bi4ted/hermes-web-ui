@@ -8,6 +8,7 @@ sessionRoutes.get('/api/hermes/sessions/conversations/:id/messages', ctrl.getCon
 sessionRoutes.get('/api/hermes/sessions', ctrl.list)
 sessionRoutes.get('/api/hermes/search/sessions', ctrl.search)
 sessionRoutes.get('/api/hermes/sessions/search', ctrl.search)
+sessionRoutes.post('/api/hermes/sessions/sync', ctrl.syncFromCli)
 sessionRoutes.get('/api/hermes/sessions/usage', ctrl.usageBatch)
 sessionRoutes.get('/api/hermes/usage/stats', ctrl.usageStats)
 sessionRoutes.get('/api/hermes/sessions/context-length', ctrl.contextLength)

@@ -147,3 +147,7 @@ export async function fetchContextLength(profile?: string): Promise<number> {
   const res = await request<{ context_length: number }>(`/api/hermes/sessions/context-length${query ? `?${query}` : ''}`)
   return res.context_length
 }
+
+export async function syncSessionsFromCli(): Promise<{ synced: number; updated: number; errors: number }> {
+  return request('/api/hermes/sessions/sync', { method: 'POST' })
+}

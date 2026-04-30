@@ -1,33 +1,22 @@
 /**
  * Sync Hermes sessions from all profiles on startup.
  * Reads api_server sessions from Hermes state.db and imports into local DB.
- * Only runs when local DB is empty (first startup).
+ *
+ * Two modes:
+ *   1. auto (startup): only runs when local DB is empty
+ *   2. force (manual/API): runs regardless, updates existing sessions
+ *
+ * Session identity: uses the Hermes CLI session ID directly as the local DB ID,
+ * so repeated syncs properly detect and update existing sessions.
  */
 import { readdirSync, existsSync } from 'fs'
 import { resolve, join } from 'path'
 import { homedir } from 'os'
 import { DatabaseSync } from 'node:sqlite'
-import { randomBytes } from 'crypto'
 import { getProfileDir } from './hermes-profile'
-import { createSession, addMessage, updateSession, getSession } from '../../db/hermes/session-store'
+import { createSession, addMessage, deleteSession, updateSession, getSession } from '../../db/hermes/session-store'
 import { getDb } from '../../db/index'
 import { logger } from '../logger'
-
-/**
- * Generate a UUID v4 without external dependencies
- */
-function generateUuid(): string {
-  const bytes = randomBytes(16)
-  bytes[6] = (bytes[6]! & 0x0f) | 0x40 // Version 4
-  bytes[8] = (bytes[8]! & 0x3f) | 0x80 // Variant 10
-  return [
-    bytes.subarray(0, 4).toString('hex'),
-    bytes.subarray(4, 6).toString('hex'),
-    bytes.subarray(6, 8).toString('hex'),
-    bytes.subarray(8, 10).toString('hex'),
-    bytes.subarray(10, 16).toString('hex'),
-  ].join('-')
-}
 
 const HERMES_BASE = resolve(homedir(), '.hermes')
 const PROFILES_DIR = join(HERMES_BASE, 'profiles')
@@ -99,14 +88,16 @@ function openHermesStateDb(profile: string): DatabaseSync {
 }
 
 /**
- * Sync api_server sessions from a single profile
+ * Sync api_server sessions from a single profile.
+ * Uses the CLI session ID directly as the local DB session ID,
+ * so re-syncing properly updates existing sessions.
  */
 function syncProfileSessions(profile: string): {
   synced: number
-  skipped: number
+  updated: number
   errors: string[]
 } {
-  const result = { synced: 0, skipped: 0, errors: [] as string[] }
+  const result = { synced: 0, updated: 0, errors: [] as string[] }
 
   try {
     const db = openHermesStateDb(profile)
@@ -144,19 +135,18 @@ function syncProfileSessions(profile: string): {
       logger.info(`[session-sync] profile '${profile}': found ${sessions.length} api_server sessions`)
       for (const hermesSession of sessions) {
         try {
-          // Check if this Hermes session ID already exists in local DB
-          const existing = getSession(hermesSession.id)
-          if (existing) {
-            result.skipped++
-            continue
-          }
+          // Use CLI session ID directly as local session ID
+          const sessionId = hermesSession.id
+          const existing = getSession(sessionId)
 
-          // Generate new session ID
-          const newSessionId = generateUuid()
+          // If updating, delete old session data first (messages + session row)
+          if (existing) {
+            deleteSession(sessionId)
+          }
 
           // Create session in local DB
           createSession({
-            id: newSessionId,
+            id: sessionId,
             profile,
             model: hermesSession.model,
             title: hermesSession.title || undefined,
@@ -187,7 +177,7 @@ function syncProfileSessions(profile: string): {
           // Insert all messages
           for (const msg of messages) {
             addMessage({
-              session_id: newSessionId,
+              session_id: sessionId,
               role: msg.role,
               content: msg.content,
               tool_call_id: msg.tool_call_id,
@@ -207,19 +197,18 @@ function syncProfileSessions(profile: string): {
           const firstUserMessage = messages.find(m => m.role === 'user' && m.content)
           let preview = ''
           if (firstUserMessage && firstUserMessage.content) {
-            // Remove newlines, truncate to 63 chars
             preview = firstUserMessage.content
               .replace(/[\n\r]/g, ' ')
               .trim()
               .slice(0, 63)
           }
 
-          // Update session with Hermes data
+          // Update session with Hermes metadata
           const estimatedCost = typeof hermesSession.estimated_cost_usd === 'number'
             ? hermesSession.estimated_cost_usd
             : 0
 
-          updateSession(newSessionId, {
+          updateSession(sessionId, {
             started_at: hermesSession.started_at,
             ended_at: hermesSession.ended_at,
             end_reason: hermesSession.end_reason,
@@ -229,12 +218,17 @@ function syncProfileSessions(profile: string): {
             cache_write_tokens: hermesSession.cache_write_tokens,
             reasoning_tokens: hermesSession.reasoning_tokens,
             estimated_cost_usd: estimatedCost,
-            last_active: hermesSession.started_at, // Use started_at as fallback since last_active doesn't exist in Hermes state.db
+            last_active: hermesSession.started_at,
             preview,
           })
 
-          result.synced++
-          logger.info(`[session-sync] synced Hermes session ${hermesSession.id} -> ${newSessionId} (${messages.length} messages)`)
+          if (existing) {
+            result.updated++
+            logger.info(`[session-sync] updated session ${sessionId} (${messages.length} messages)`)
+          } else {
+            result.synced++
+            logger.info(`[session-sync] synced new session ${sessionId} (${messages.length} messages)`)
+          }
         } catch (err: any) {
           result.errors.push(`session ${hermesSession.id}: ${err.message}`)
           logger.warn(err, `[session-sync] failed to sync session ${hermesSession.id}`)
@@ -254,38 +248,21 @@ function syncProfileSessions(profile: string): {
 }
 
 /**
- * Main entry point: sync all profiles on startup
- * Only runs if local DB is empty (first startup or after DB reset)
+ * Sync all Hermes CLI sessions into the local DB.
+ * Uses CLI session IDs directly so re-syncs update existing data.
  */
-export function syncAllHermesSessionsOnStartup(): void {
-  // Check if local DB has any sessions - only sync if completely empty
-  const db = getDb()
-  if (!db) {
-    logger.info('[session-sync] SQLite not available, skipping Hermes sync')
-    return
-  }
-
-  const countResult = db.prepare('SELECT COUNT(*) as count FROM sessions').get() as { count: number } | undefined
-  const hasExistingSessions = countResult && countResult.count > 0
-
-  if (hasExistingSessions) {
-    logger.info('[session-sync] local DB has %d sessions, skipping Hermes sync', countResult!.count)
-    return
-  }
-
-  logger.info('[session-sync] local DB is empty, starting Hermes session sync...')
-
+function syncAllProfiles(): { synced: number; updated: number; errors: number } {
   const profiles = getAllProfiles()
   logger.info(`[session-sync] found ${profiles.length} profiles: ${profiles.join(', ')}`)
 
   let totalSynced = 0
-  let totalSkipped = 0
+  let totalUpdated = 0
   let totalErrors = 0
 
   for (const profile of profiles) {
     const result = syncProfileSessions(profile)
     totalSynced += result.synced
-    totalSkipped += result.skipped
+    totalUpdated += result.updated
     totalErrors += result.errors.length
 
     if (result.errors.length > 0) {
@@ -299,5 +276,49 @@ export function syncAllHermesSessionsOnStartup(): void {
     }
   }
 
-  logger.info(`[session-sync] sync complete: synced=${totalSynced}, skipped=${totalSkipped}, errors=${totalErrors}`)
+  logger.info(`[session-sync] sync complete: synced=${totalSynced}, updated=${totalUpdated}, errors=${totalErrors}`)
+  return { synced: totalSynced, updated: totalUpdated, errors: totalErrors }
+}
+
+/**
+ * Main entry point: sync all profiles on startup.
+ * Only runs if local DB is empty (first startup or after DB reset).
+ */
+export function syncAllHermesSessionsOnStartup(): void {
+  const db = getDb()
+  if (!db) {
+    logger.info('[session-sync] SQLite not available, skipping Hermes sync')
+    return
+  }
+
+  const countResult = db.prepare('SELECT COUNT(*) as count FROM sessions').get() as { count: number } | undefined
+  const hasExistingSessions = countResult && countResult.count > 0
+
+  if (hasExistingSessions) {
+    logger.info('[session-sync] local DB has %d sessions, skipping auto Hermes sync', countResult!.count)
+    return
+  }
+
+  logger.info('[session-sync] local DB is empty, starting Hermes session sync...')
+  syncAllProfiles()
+}
+
+/**
+ * Force sync: re-import all Hermes CLI sessions, updating existing ones.
+ * Always runs regardless of local DB state.
+ * Returns a summary for the caller.
+ */
+export function forceSyncAllHermesSessions(): {
+  synced: number
+  updated: number
+  errors: number
+} {
+  const db = getDb()
+  if (!db) {
+    logger.info('[session-sync] SQLite not available, skipping Hermes sync')
+    return { synced: 0, updated: 0, errors: 0 }
+  }
+
+  logger.info('[session-sync] force sync requested, starting Hermes session sync...')
+  return syncAllProfiles()
 }

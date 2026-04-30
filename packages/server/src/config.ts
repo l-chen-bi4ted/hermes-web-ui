@@ -8,5 +8,5 @@ export const config = {
   dataDir: resolve(__dirname, '..', 'data'),
   corsOrigins: process.env.CORS_ORIGINS || '*',
   /** Session store: 'local' (self-built SQLite) or 'remote' (Hermes CLI) */
-  sessionStore: (process.env.SESSION_STORE || 'remote') as 'local' | 'remote',
+  sessionStore: (process.env.SESSION_STORE || 'local') as 'local' | 'remote',
 }

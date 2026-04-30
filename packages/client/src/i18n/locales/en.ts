@@ -488,6 +488,11 @@ export default {
       liveMonitorHumanOnly: 'Live monitor: show human sessions only',
       liveMonitorHumanOnlyHint: 'Hide sub-agent/session monitor noise in the Live monitor by default',
       atHourHint: 'Reset session at this hour daily',
+      syncFromCli: 'Sync from Hermes CLI',
+      syncFromCliHint: 'Re-import all sessions from Hermes CLI state.db into the local database. Existing sessions will be updated.',
+      syncFromCliAction: 'Sync Now',
+      syncComplete: 'Sync complete ({synced} new, {updated} updated, {errors} errors)',
+      syncFailed: 'Sync failed, check server logs',
     },
     privacy: {
       redactPii: 'Redact PII',

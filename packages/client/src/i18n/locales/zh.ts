@@ -480,6 +480,11 @@ export default {
       liveMonitorHumanOnly: '实时监看：仅显示人类会话',
       liveMonitorHumanOnlyHint: '在实时监看中默认隐藏子代理和会话监看噪音',
       atHourHint: '每天在指定小时重置会话',
+      syncFromCli: '从 CLI 同步会话',
+      syncFromCliHint: '将 Hermes CLI state.db 中的所有会话重新导入本地数据库，已有会话会覆盖更新',
+      syncFromCliAction: '开始同步',
+      syncComplete: '同步完成（新增 {synced}，更新 {updated}，错误 {errors}）',
+      syncFailed: '同步失败，请检查服务端日志',
     },
     privacy: {
       redactPii: '脱敏 PII',
