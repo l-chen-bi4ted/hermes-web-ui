@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NInputNumber, NSelect, NSwitch, NRadioGroup, NRadioButton, useMessage } from 'naive-ui'
+import { NInputNumber, NSelect, NSwitch, useMessage } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/hermes/settings'
 import { useSessionBrowserPrefsStore } from '@/stores/hermes/session-browser-prefs'
@@ -13,15 +13,6 @@ const { t } = useI18n()
 async function save(values: Record<string, any>) {
   try {
     await settingsStore.saveSection('session_reset', values)
-    message.success(t('settings.saved'))
-  } catch (err: any) {
-    message.error(t('settings.saveFailed'))
-  }
-}
-
-async function saveSessionStore(mode: 'local' | 'remote') {
-  try {
-    await settingsStore.saveSection('session_store', { mode })
     message.success(t('settings.saved'))
   } catch (err: any) {
     message.error(t('settings.saveFailed'))
@@ -58,15 +49,6 @@ async function saveSessionStore(mode: 'local' | 'remote') {
         size="small" class="input-sm"
         @update:value="v => v != null && save({ at_hour: v })"
       />
-    </SettingRow>
-    <SettingRow :label="t('settings.session.storeMode')" :hint="t('settings.session.storeModeHint')">
-      <NRadioGroup
-        :value="settingsStore.sessionStore.mode"
-        @update:value="(v: 'local' | 'remote') => saveSessionStore(v)"
-      >
-        <NRadioButton value="local">{{ t('settings.session.storeLocal') }}</NRadioButton>
-        <NRadioButton value="remote">{{ t('settings.session.storeRemote') }}</NRadioButton>
-      </NRadioGroup>
     </SettingRow>
     <SettingRow :label="t('settings.session.liveMonitorHumanOnly')" :hint="t('settings.session.liveMonitorHumanOnlyHint')">
       <NSwitch

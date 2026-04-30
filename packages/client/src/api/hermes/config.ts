@@ -44,7 +44,6 @@ export interface AppConfig {
   memory?: MemoryConfig
   session_reset?: SessionResetConfig
   privacy?: PrivacyConfig
-  session_store?: { mode: 'local' | 'remote' }
   telegram?: Record<string, any>
   discord?: Record<string, any>
   slack?: Record<string, any>

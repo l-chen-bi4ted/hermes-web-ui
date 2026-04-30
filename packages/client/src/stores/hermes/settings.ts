@@ -11,7 +11,6 @@ export const useSettingsStore = defineStore('settings', () => {
   const agent = ref<AgentConfig>({})
   const memory = ref<MemoryConfig>({})
   const sessionReset = ref<SessionResetConfig>({})
-  const sessionStore = ref<{ mode: 'local' | 'remote' }>({ mode: 'local' })
   const privacy = ref<PrivacyConfig>({})
   const telegram = ref<Record<string, any>>({})
   const discord = ref<Record<string, any>>({})
@@ -32,7 +31,6 @@ export const useSettingsStore = defineStore('settings', () => {
       agent.value = data.agent || {}
       memory.value = data.memory || {}
       sessionReset.value = data.session_reset || {}
-      sessionStore.value = data.session_store || { mode: 'local' }
       privacy.value = data.privacy || {}
       telegram.value = data.telegram || {}
       discord.value = data.discord || {}
@@ -60,7 +58,6 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'agent': agent.value = { ...agent.value, ...values }; break
       case 'memory': memory.value = { ...memory.value, ...values }; break
       case 'session_reset': sessionReset.value = { ...sessionReset.value, ...values }; break
-      case 'session_store': sessionStore.value = { ...sessionStore.value, ...values }; break
       case 'privacy': privacy.value = { ...privacy.value, ...values }; break
       case 'telegram': telegram.value = { ...telegram.value, ...values }; break
       case 'discord': discord.value = { ...discord.value, ...values }; break
@@ -89,7 +86,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   return {
     loading, saving,
-    display, agent, memory, sessionReset, sessionStore, privacy,
+    display, agent, memory, sessionReset, privacy,
     telegram, discord, slack, whatsapp, matrix, wecom, feishu, dingtalk, weixin, platforms,
     fetchSettings, saveSection,
   }

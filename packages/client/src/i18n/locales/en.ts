@@ -488,10 +488,6 @@ export default {
       liveMonitorHumanOnly: 'Live monitor: show human sessions only',
       liveMonitorHumanOnlyHint: 'Hide sub-agent/session monitor noise in the Live monitor by default',
       atHourHint: 'Reset session at this hour daily',
-      storeMode: 'Session Data Source',
-      storeModeHint: 'Local: self-built SQLite (synced from CLI on first startup); Remote: read Hermes CLI state.db directly',
-      storeLocal: 'Local',
-      storeRemote: 'Remote (read CLI)',
     },
     privacy: {
       redactPii: 'Redact PII',
